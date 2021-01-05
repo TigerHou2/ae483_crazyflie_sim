@@ -95,7 +95,8 @@ end
 % scale o to make quadcopter look smaller
 O_s = 6*o_s;
 
-dirpath = 'C:\Users\tigre\Desktop\Directory\UIUC\ae483\lab3_data_mat';
+dirpath = ['C:\Users\tigre\Desktop\Directory\UIUC' ...
+           '\ae483\crazyflie_python_controls\lab3_data_mat'];
 dat = open([dirpath '\dat_' physDataName '.mat']);
 
 dat.switches(end+1) = max(dat.t);
@@ -126,21 +127,29 @@ hold off
 close(figure(2));
 figure(2); hold on; box on; grid on;
 oo_s = o_s .* [1;-1;-1];
-plot3(oo_s(1,:),oo_s(2,:), oo_s(3,:),'k'); % plot quadrotor trajectory in Z-up frame
-plot3(oo_s(1,1:50:end), ...
-      oo_s(2,1:50:end), ...
-      oo_s(3,1:50:end),'b.','markersize',10); % plot points along trajectory equally spaced in time
+plot3(oo_s(1,:),oo_s(2,:), oo_s(3,:),'k',...
+      'HandleVisibility','Off'); % plot quadrotor trajectory in Z-up frame
+plot3(oo_s(1,1:75:end), ...
+      oo_s(2,1:75:end), ...
+      oo_s(3,1:75:end),'b.','markersize',12,...
+      'DisplayName','Simulation'); % plot points along trajectory equally spaced in time
 
 oo_r = o_r .* [1;-1;-1];
-plot3(oo_r(1,:),oo_r(2,:), oo_r(3,:),'k'); % plot quadrotor trajectory in Z-up frame
+plot3(oo_r(1,:),oo_r(2,:), oo_r(3,:),'k',...
+      'HandleVisibility','Off'); % plot quadrotor trajectory in Z-up frame
 plot3(oo_r(1,1:end), ...
       oo_r(2,1:end), ...
-      oo_r(3,1:end),'r.','markersize',10); % plot points along trajectory equally spaced in time
+      oo_r(3,1:end),'r.','markersize',12,...
+      'DisplayName','Experiment'); % plot points along trajectory equally spaced in time
 xlabel('X, m');
 ylabel('Y, m');
 zlabel('Z, m');
+latexify(16,14,15)
+expand
 axis equal
 view(3)
+setgrid
+legend('Location','Best')
 hold off
 
 %% Show time-of-flights
@@ -181,3 +190,38 @@ xlim([0,floor(max(switch_times(end),switches(end)))+1])
 hold off
 latexify(16,4)
 expand(0.1,0.02,0,0.02)
+
+%% Show Axis Comparisons
+close(figure(4))
+figure(4)
+
+simStyle = 'b-';
+expStyle = 'r-.';
+
+subplot(3,1,1)
+hold on
+plot(data.t,data.x(1,:),simStyle,'LineWidth',1.5)
+plot(dat.t,dat.px,expStyle,'LineWidth',1.5)
+ylabel('X, m')
+hold off
+setgrid
+legend('Simulation','Experiment','Location','Best')
+
+subplot(3,1,2)
+hold on
+plot(data.t,-data.x(2,:),simStyle,'LineWidth',1.5)
+plot(dat.t,dat.py,expStyle,'LineWidth',1.5)
+ylabel('Y, m')
+hold off
+setgrid
+
+subplot(3,1,3)
+hold on
+plot(data.t,-data.x(3,:),simStyle,'LineWidth',1.5)
+plot(dat.t,dat.pz,expStyle,'LineWidth',1.5)
+ylabel('Z, m')
+xlabel('Time, s')
+hold off
+setgrid
+
+latexify(24,14,15)

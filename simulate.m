@@ -2,19 +2,19 @@ function [data] = simulate(h_num,p,xe,x0,xTol,t0,tStab,tMax,data)
 %
 % Inputs:
 %   h_num - matlabFunction of EOMs created by findeoms.m
-%       p - structure containing drone parameters
-%       m - [kg] scalar,         mass
-%       g - [m/s^2] scalar,      gravity
-%       J - [kg-m^2] 3x3 matrix, moment of inertia
-%      td - [s] scalar,          time delay of motors
-%      sd - 12x1 vector,         sensor standard deviations
-%      xe - 12x1 vector,         target state
-%      x0 - 12x1 vector,         initial state
-%    xTol - [m] scalar,          position tolerance for convergence
-%      t0 - [s] scalar,          initial time
-%   tStab - [s] scalar,          hover time
-%    tMax - [s] scalar,          max sim time
-%  tDelay - [s] scalar,          time delay on motor response
+%       p - structure, contains the following drone parameters:
+%           m - [kg] scalar,         mass
+%           g - [m/s^2] scalar,      gravity
+%           J - [kg-m^2] 3x3 matrix, moment of inertia
+%          td - [s] scalar,          time delay of motors
+%          sd - 12x1 vector,         sensor standard deviations
+%      xe - 12x1 vector,    target state
+%      x0 - 12x1 vector,    initial state
+%    xTol - [m] scalar,     position tolerance for convergence
+%      t0 - [s] scalar,     initial time
+%   tStab - [s] scalar,     hover time
+%    tMax - [s] scalar,     max sim time
+%    data - structure, contains 
 
 % Choose a sample rate. This is the number of times per second that the
 % controller will run. This is also the number of times per second that
@@ -27,7 +27,7 @@ velRate = 100; % PID controller freq for velocity
 angRate = 500; % PID controller freq for attitude
 rtnRate = 500; % PID controller freq for attitude rate
 pidRates = [posRate,velRate,angRate,rtnRate];
-physicsRate = 2; % simulate physics at a multiple of the max data rate
+physicsRate = 3; % simulate physics at a multiple of the max data rate
 sampleRate = max(pidRates) * physicsRate;
 pidRates(end+1) = sampleRate;
 
@@ -48,15 +48,15 @@ sampleNumber = ceil(tMax*sampleRate);
 % I initialize the time and state with their initial values. I initialize
 % the input as an empty matrix - no inputs have been chosen yet.
 if isempty(data)
-    data = struct('t', t0, ...
-                  'x', x0, ...
-                  'u', [0; 0; 0; p.m * p.g], ...
-                  'm', zeros(4,1), ... % motor PWM
-                  'e', zeros(12,1), ...
-                  'int', zeros(12,1), ... % integral error
-                  'xd', zeros(12,1), ...
-                  'xn', x0, ...
-                  'lpf', {cell(12,1)});
+    data = struct('t', t0, ... time
+                  'x', x0, ... ground truth states (updated at sampleRate)
+                  'u', [0; 0; 0; p.m * p.g], ... control input
+                  'm', zeros(4,1), ... motor RPM
+                  'e', zeros(12,1), ... state errors
+                  'int', zeros(12,1), ... integral errors
+                  'xd', zeros(12,1), ... desired state
+                  'xn', x0, ... perturbed state (updated at PID rates)
+                  'lpf', {cell(12,1)} ); % low pass filter structure
     idx0 = 1;
 else
     idx0 = length(data.t);

@@ -67,11 +67,11 @@ td = 0.18;              % s, motor time delay from zero to full thrust
     J = J_batt + J_motor + J_flow + J_board;
 
 % model sensor noise using a zero-mean normal distribution
-sd = [0.010, 0.010, 0.010, ...      position
+sd = [0.005, 0.005, 0.005, ...      position
       deg2rad([0.2, 0.2, 0.2]), ... attitude
-      0.010, 0.010, 0.010, ...      velocity
-      deg2rad([5, 5, 5]), ...       attitude rate
-      ]' / 3 * 2;
+      0.020, 0.020, 0.020, ...      velocity
+      deg2rad([3, 3, 3]), ...       attitude rate
+      ]';
 
 % It is helpful to package all parameter values into a struct that can be
 % stored for use later in control design.

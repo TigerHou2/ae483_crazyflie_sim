@@ -9,7 +9,7 @@ function [U,e,int,m,xd,LPF] = ...
 %        XN - 12xN matrix of perturbed states over N timesteps
 %         E - 12xN matrix of state errors
 %       INT - 12x1 vector of integral errors
-%        m0 - 12x1 vector of motor PWM values at the (N-1)th timestep
+%        m0 - 12x1 vector of motor RPM values at the (N-1)th timestep
 %     noise - 12x1 vector of sensor noise
 %    tDelay - scalar, motor time delay from 0% to 100% thrust
 %             we assume that the motor ramp-up time is linear; for exmaple,
@@ -28,7 +28,7 @@ function [U,e,int,m,xd,LPF] = ...
 %       int - updated integral errors
 %         m - 4x1 vector of motor outputs
 %        xd - 12x1 vector of desired states
-%       LPF - updated low pass filters
+%       LPF - 12x1 cell of updated low pass filters
 % 
 % Note - the 12 states are as follows:
 %   [3x1] position in fixed frame
@@ -61,14 +61,17 @@ thrustCap   = 65535; % unsigned 16-bit int signal to motor, equals 60 grams
 signed_int16 = 32767; % max value of 16-bit signed int
 L = 0.092; % m, width of Crazyflie (between adjacent motors)
 D = 0.045; % m, diameter of rotor
-Cp = 0.10 * 1.5; % assume const. rotor power coeff. (0.1 from paper)
-Ct = 0.15 * 1.5; % assume const. rotor thrust coeff. (0.15 from paper)
+Cp = 0.10; % assume const. rotor power coeff. (0.1 from paper)
+Ct = 0.15; % assume const. rotor thrust coeff. (0.15 from paper)
 rho = 1.225; % kg/m^3, density of air
-rpm = @(PWM) 0.2685 * PWM + 4070.3; % pwm to motor rpm
-thr = @(PWM) Ct * rho * (rpm(PWM)/60)^2 * D^4; % thrust per motor
-tau = @(PWM) Cp * rho * (rpm(PWM)/60)^2 * D^5 / (2*pi); % torque
+% rpm = @(PWM) (0.2685 * PWM + 4070.3)*double(PWM>10000); % pwm to motor rpm
+rpm = @(PWM)   1.280e-10*PWM^3 - 1.513e-05*PWM^2 ...
+             + 8.267e-01*PWM^1 + 874; % pwm to motor rpm
+thr = @(RPM) Ct * rho * (RPM/60)^2 * D^4; % thrust per motor
+tau = @(RPM) Cp * rho * (RPM/60)^2 * D^5 / (2*pi); % torque
 idx = idx + 1;
-yawDecay = 7.5; % deg/s, models the yaw decay of the Kalman filter
+rpmCap = rpm(thrustCap);
+% yawDecay = 7.5; % deg/s, models the yaw decay of the Kalman filter
 
 %% PID defaults
 %   position_controller_pid.c for pos and vel gains
@@ -90,14 +93,16 @@ PID = [  2.00    0.00    0.00 ; ... % x
 
 %% PID modifications
 %   any changes to the default PID values should be made here
+
+% flight plan A
 PID(1,:) = [2.2, 0, -0.05];
 PID(2,:) = [2.2, 0, -0.05];
 PID(3,:) = [2.6, 0.4, 0.05];
+
+% flight plan B
 % PID(1,:) = [3.3, 0.1, 0.1];
 % PID(2,:) = [3.6, 0.1, 0.1];
 % PID(3,:) = [1.9, 0.2, 0.1];
-% PID(4:6,:) = PID(4:6,:) * 2;
-% PID(10:12,:) = PID(10:12,:) * 2;
 
 %% integration limits
 %   pid.h
@@ -177,7 +182,8 @@ pitch = des_ang(2); %      the reason this is setup like this is because
                     %      converted to the actual roll/pitch desired.
                     %      (As per Crazyflie documentation)
 thrust = des_ang(3);
-des_ang(1) =   constrain(XN(4,IDX),yawDecay*dT); % yaw
+des_ang(1) =   mod(rad2deg(XN(4,IDXm))+180,360)-180; % yaw, line 70 of
+                                                     % controller_pid.c
 des_ang(2) =   roll *cos(XN(4,IDX)) + pitch*sin(XN(4,IDX));  % pitch
 des_ang(3) = - pitch*cos(XN(4,IDX)) + roll *sin(XN(4,IDX));  % roll
 des_ang = constrain(des_ang,clim(sub_next));
@@ -200,6 +206,7 @@ integral_terms = INT(sub) + E(sub,IDX).*dT * double(IDX == idx-1);
 integral_terms = constrain(integral_terms,ilim(sub));
 int(sub) = integral_terms;
 deriv_term = (E(sub,IDX)-E(sub,IDXm)) ./ dT;
+% low pass filters were disabled for the attitude controller
 %     [LPF{sub(1)},d1] = lpf(LPF{sub(1)}, deriv_term(1), pidRates(2), cutoff_freq(sub(1)));
 %     [LPF{sub(2)},d2] = lpf(LPF{sub(2)}, deriv_term(2), pidRates(2), cutoff_freq(sub(2)));
 %     [LPF{sub(3)},d3] = lpf(LPF{sub(3)}, deriv_term(3), pidRates(2), cutoff_freq(sub(3)));
@@ -222,6 +229,7 @@ integral_terms = INT(sub) + E(sub,IDX).*dT * double(IDX == idx-1);
 integral_terms = constrain(integral_terms,ilim(sub));
 int(sub) = integral_terms;
 deriv_term = (E(sub,IDX)-E(sub,IDXm)) ./ dT;
+% low pass filters were disabled for the attitude rate controller
 %     [LPF{sub(1)},d1] = lpf(LPF{sub(1)}, deriv_term(1), pidRates(2), cutoff_freq(sub(1)));
 %     [LPF{sub(2)},d2] = lpf(LPF{sub(2)}, deriv_term(2), pidRates(2), cutoff_freq(sub(2)));
 %     [LPF{sub(3)},d3] = lpf(LPF{sub(3)}, deriv_term(3), pidRates(2), cutoff_freq(sub(3)));
@@ -229,25 +237,28 @@ deriv_term = (E(sub,IDX)-E(sub,IDXm)) ./ dT;
 output = runPid( E(sub,IDX), integral_terms, deriv_term, PID(sub,:) );
 output = constrain(output,signed_int16);
 
-%% Motor Commands
+%% Motor Raw Commands
 r = output(1) / 2;
 p = output(2) / 2;
-y = -output(3);
+y = -output(3);  % controller_pid.c line 114
 m1 = max(min(thrust-r+p+y,thrustCap),0);
 m2 = max(min(thrust-r-p-y,thrustCap),0);
 m3 = max(min(thrust+r-p+y,thrustCap),0);
 m4 = max(min(thrust+r+p-y,thrustCap),0);
 
+%% Motor RPM
+rpm1 = rpm(m1); rpm2 = rpm(m2); rpm3 = rpm(m3); rpm4 = rpm(m4);
+
 %% Motor Delay
-dm = m0 - [m1;m2;m3;m4];
-dmCap = thrustCap * dt / tDelay;
+dm = m0 - [rpm1;rpm2;rpm3;rpm4];
+dmCap = rpmCap * dt / tDelay;
 dm = constrain(dm,dmCap);
 mOut = m0 - dm;
-m1 = mOut(1); m2 = mOut(2); m3 = mOut(3); m4 = mOut(4);
+rpm1 = mOut(1); rpm2 = mOut(2); rpm3 = mOut(3); rpm4 = mOut(4);
 
-%% Moments and Thrust
-t1 = tau(m1); t2 = tau(m2); t3 = tau(m3); t4 = tau(m4);
-f1 = thr(m1); f2 = thr(m2); f3 = thr(m3); f4 = thr(m4);
+%% Motor Moments and Thrust
+t1 = tau(rpm1); t2 = tau(rpm2); t3 = tau(rpm3); t4 = tau(rpm4);
+f1 = thr(rpm1); f2 = thr(rpm2); f3 = thr(rpm3); f4 = thr(rpm4);
 U = zeros(4,1);
 U(4) = (f1+f2+f3+f4);
 U(1) = L/2 * (f3+f4-f1-f2); % roll
