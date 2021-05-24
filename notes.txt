@@ -1,0 +1,5 @@
+Change display size of Crazyflie PC client: 
+- go to the crazyflie pc client application
+- right click > properties > compatability > change high DPI settings
+- check "override high DPI scaling behavior"
+- select "system" from dropdown
